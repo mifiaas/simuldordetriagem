@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triagem Manchester - Simulador Completo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            --man-vermelho: #d92525;
+            --man-laranja: #f28c00;
+            --man-amarelo: #f2d600;
+            --man-verde: #008f39;
+            --man-azul: #005a9c;
+            --bg-cinza: #f4f4f4;
+        }
+
+        body { font-family: Arial, sans-serif; background-color: #e9ecef; }
+
+        @media print {
+            .app-ui { display: none !important; }
+            .print-area { display: block !important; }
+            body { background-color: white; margin: 0; padding: 0; }
+        }
+
+        .print-area { display: none; }
+
+        .top-header { background: #fff; border-bottom: 2px solid #ccc; padding: 10px 20px; position: sticky; top: 0; z-index: 100; opacity: 0.5; pointer-events: none; transition: 0.3s; }
+        .top-header.ativo { opacity: 1; pointer-events: auto; }
+        
+        .vital-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; }
+        .vital-item { border-right: 1px solid #eee; padding: 0 5px; cursor: pointer; transition: 0.2s; }
+        .vital-item:hover { background-color: #f0f8ff; border-radius: 5px; }
+        .vital-value { font-weight: bold; font-size: 1.1rem; color: #333; }
+
+        .status-badge {
+            font-size: 1.1rem; font-weight: bold; padding: 10px; border-radius: 4px;
+            color: white; text-transform: uppercase; text-align: center; min-width: 200px;
+            background-color: #6c757d; transition: all 0.3s ease;
+        }
+        .progresso-texto { font-size: 0.8rem; display: block; font-weight: normal; margin-top: 3px; }
+
+        .main-container { padding: 20px; max-width: 1400px; margin: 0 auto; }
+        .painel-dados { background: white; padding: 20px; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+
+        .area-triagem { display: none; } /* Escondido inicialmente */
+
+        .bloco-risco { margin-bottom: 20px; background: #fff; border: 1px solid #ccc; }
+        .titulo-risco { padding: 8px; text-align: center; font-weight: bold; color: white; text-transform: uppercase; }
+        .bg-emergencia { background-color: var(--man-vermelho); }
+        .bg-muitourgente { background-color: var(--man-laranja); }
+        .bg-urgente { background-color: var(--man-amarelo); color: #333 !important; }
+        .bg-poucourgente { background-color: var(--man-verde); }
+        .bg-naourgente { background-color: var(--man-azul); }
+
+        .itens-grid { display: grid; grid-template-columns: 1fr 1fr; }
+        .discriminador-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 15px; border-bottom: 1px solid #eee; transition: all 0.3s ease; }
+        .discriminador-row:nth-child(4n-1), .discriminador-row:nth-child(4n) { background-color: var(--bg-cinza); }
+        .discriminador-texto { flex-grow: 1; font-size: 0.9rem; padding-right: 10px; }
+
+        .btn-triagem { width: 35px; height: 35px; border: 1px solid #ccc; background: white; margin-left: 5px; font-weight: bold; font-size: 1.1rem; cursor: pointer; color: #aaa; transition: all 0.1s; flex-shrink: 0; }
+        .btn-triagem.active-v { background-color: #198754 !important; color: white !important; border-color: #146c43 !important; }
+        .btn-triagem.active-x { background-color: #dc3545 !important; color: white !important; border-color: #b02a37 !important; }
+
+        .lista-encaminhamento { max-height: 300px; overflow-y: auto; }
+        .btn-encaminhamento { width: 100%; text-align: left; padding: 12px 15px; border: none; border-bottom: 1px solid #eee; background: white; font-weight: bold; color: #555; transition: 0.2s; }
+        .btn-encaminhamento:hover, .btn-encaminhamento.selected { background-color: #e9ecef; border-left: 4px solid var(--man-verde); color: #000; }
+
+        /* Ficha Impressa do SUS */
+        .ficha-sus { font-family: Arial, sans-serif; padding: 20px; color: #000; }
+        .ficha-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+        .ficha-header h4 { margin: 5px 0; font-weight: bold; }
+        .ficha-header p { margin: 2px 0; font-size: 0.8rem; }
+        .ficha-paciente { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem; background: #f9f9f9; padding: 15px; border: 1px solid #000; margin-bottom: 20px; }
+        .ficha-titulo-class { text-align: center; font-size: 1.2rem; font-weight: bold; margin: 20px 0; padding: 10px; border: 2px solid #000; text-transform: uppercase; }
+        .ficha-corpo { font-size: 0.9rem; line-height: 1.6; }
+        .vitais-print { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 15px; font-weight: bold; }
+        .assinatura-box { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; font-size: 0.85rem; }
+
+        @media (max-width: 768px) { .itens-grid { grid-template-columns: 1fr; } .discriminador-row:nth-child(even) { background-color: var(--bg-cinza); } }
+    </style>
+</head>
+<body>
+
+<div class="app-ui">
+    <div class="top-header" id="barraSuperior">
+        <div class="row align-items-center">
+            <div class="col-md-2 fw-bold text-success fs-5">ToLive Sim</div>
+            <div class="col-md-6">
+                <div class="vital-grid">
+                    <div class="vital-item" onclick="abrirModal('Glasgow')">Glasgow <div class="vital-value" id="valGlasgow">--</div></div>
+                    <div class="vital-item" onclick="abrirModal('Dor')">Dor <div class="vital-value" id="valDor">--</div></div>
+                    <div class="vital-item" onclick="abrirModal('Temperatura')">Temp <div class="vital-value" id="valTemp">--</div></div>
+                    <div class="vital-item" onclick="abrirModal('Pressao')">PA <div class="vital-value" id="valPA">--</div></div>
+                </div>
+            </div>
+            <div class="col-md-4 text-end d-flex gap-2 align-items-center justify-content-end">
+                <div id="statusBadge" class="status-badge">
+                    Pendente
+                    <span id="progressoTexto" class="progresso-texto">0/21 respondidos</span>
+                </div>
+                <button id="btnAvancar" class="btn btn-dark btn-lg" onclick="tentarAvancar()">
+                    <i class="bi bi-arrow-right-circle"></i> AVANÇAR
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="painel-dados row g-3" id="painelAdmissao">
+            <h5 class="text-primary border-bottom pb-2"><i class="bi bi-person-lines-fill"></i> Etapa 1: Admissão do Paciente</h5>
+            <div class="col-md-5">
+                <label class="form-label fw-bold small">Nome do Paciente</label>
+                <input type="text" class="form-control" id="inpNome" placeholder="Ex: Edinalva Silva">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-bold small">Idade</label>
+                <input type="text" class="form-control" id="inpIdade" placeholder="Ex: 21 anos">
+            </div>
+            <div class="col-md-5">
+                <label class="form-label fw-bold small">Enfermeiro(a) Classificador(a)</label>
+                <input type="text" class="form-control" id="inpEnf" placeholder="Nome do Aluno">
+            </div>
+            
+            <div class="col-md-6 mt-3">
+                <label class="form-label fw-bold small text-danger">Selecione o Fluxograma (Motivo da Consulta) *</label>
+                <select class="form-select border-danger" id="selectFluxograma">
+                    <option value="" selected disabled>-- Baseado no Índice de Manchester --</option>
+                    <option value="Agressão">Agressão</option>
+                    <option value="Alergia">Alergia</option>
+                    <option value="Alteração do comportamento">Alteração do comportamento</option>
+                    <option value="Asma">Asma</option>
+                    <option value="Cefaleia">Cefaleia</option>
+                    <option value="Convulsões">Convulsões</option>
+                    <option value="Desmaio">Desmaio</option>
+                    <option value="Diarreia e/ou vômitos">Diarreia e/ou vômitos</option>
+                    <option value="Dor abdominal em adulto">Dor abdominal em adulto</option>
+                    <option value="Dor abdominal em criança">Dor abdominal em criança</option>
+                    <option value="Dor torácica">Dor torácica</option>
+                    <option value="Erupção cutânea">Erupção cutânea</option>
+                    <option value="Mal-estar em adulto">Mal-estar em adulto</option>
+                    <option value="Palpitações">Palpitações</option>
+                    <option value="Quedas">Quedas</option>
+                    <option value="Trauma cranioencefálico">Trauma cranioencefálico</option>
+                </select>
+            </div>
+            
+            <div class="col-md-6 mt-3">
+                <label class="form-label fw-bold small">Queixa Principal Relatada</label>
+                <input type="text" class="form-control" id="inpQueixa" placeholder="Descreva os sintomas...">
+            </div>
+
+            <div class="col-12 text-end mt-4">
+                <button class="btn btn-primary btn-lg px-5" onclick="iniciarTriagem()">Iniciar Avaliação Clínica <i class="bi bi-play-circle"></i></button>
+            </div>
+        </div>
+
+        <div class="area-triagem" id="areaTriagem">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="fs-4 fw-bold text-secondary">Fluxograma: <span id="tituloFluxogramaTela" class="text-primary"></span></div>
+                <button class="btn btn-outline-secondary btn-sm" onclick="location.reload()"><i class="bi bi-arrow-counterclockwise"></i> Trocar Paciente</button>
+            </div>
+            <div id="fluxogramaContainer"></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalSinais" tabindex="-1">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title fs-6" id="modalTitulo">Inserir Dado</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <input type="text" class="form-control text-center fs-4" id="inputSinal">
+        <div id="erroSinal" class="text-danger mt-2 small fw-bold" style="display: none;"></div>
+      </div>
+      <div class="modal-footer py-1 justify-content-center">
+        <button type="button" class="btn btn-success btn-sm px-4" onclick="salvarSinal()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalEncaminhamento" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-3 bg-light">
+        <h5 class="modal-title fw-bold text-success"><i class="bi bi-hospital"></i> Selecionar Encaminhamento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0 lista-encaminhamento">
+        <button class="btn-encaminhamento" onclick="selecionarSetor(this, 'CLÍNICA MÉDICA')">CLÍNICA MÉDICA</button>
+        <button class="btn-encaminhamento" onclick="selecionarSetor(this, 'CIRURGIA GERAL')">CIRURGIA GERAL</button>
+        <button class="btn-encaminhamento" onclick="selecionarSetor(this, 'ORTOPEDIA')">ORTOPEDIA</button>
+        <button class="btn-encaminhamento" onclick="selecionarSetor(this, 'ODONTOLOGIA')">ODONTOLOGIA</button>
+        <button class="btn-encaminhamento" onclick="selecionarSetor(this, 'PEDIATRIA')">PEDIATRIA</button>
+        <button class="btn-encaminhamento" onclick="selecionarSetor(this, 'EXAMES')">EXAMES</button>
+        <button class="btn-encaminhamento" onclick="selecionarSetor(this, 'CURATIVO')">CURATIVO</button>
+        <button class="btn-encaminhamento" onclick="selecionarSetor(this, 'MEDICAÇÃO')">MEDICAÇÃO</button>
+        <button class="btn-encaminhamento" onclick="selecionarSetor(this, 'EMERGÊNCIA')">EMERGÊNCIA</button>
+      </div>
+      <div class="modal-footer justify-content-between py-2">
+        <span class="small fw-bold text-muted" id="setorSelecionadoTexto">Nenhum setor selecionado</span>
+        <button type="button" class="btn btn-success px-4" onclick="gerarPDF()">Concluir e Imprimir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="print-area">
+    <div class="ficha-sus">
+        <div class="ficha-header">
+            <h4><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Sistema_%C3%9Anico_de_Sa%C3%BAde_logo.svg/200px-Sistema_%C3%9Anico_de_Sa%C3%BAde_logo.svg.png" width="40" style="vertical-align: middle;"> PREFEITURA / SUS</h4>
+            <h4>Pronto Socorro Simulado</h4>
+            <p>FICHA DE ATENDIMENTO</p>
+            <p>Laboratório de Simulação Realística</p>
+        </div>
+
+        <h5 class="text-center fw-bold">Paciente: <span id="outNome">-------------------</span></h5>
+        
+        <div class="ficha-paciente">
+            <div>
+                <strong>Idade:</strong> <span id="outIdade">--</span><br>
+                <strong>Mãe:</strong> Não Informado<br>
+                <strong>CPF:</strong> 000.000.000-00<br>
+            </div>
+            <div>
+                <strong>Setor:</strong> CR<br>
+                <strong>Data/hora entrada:</strong> <span id="outData">--/--/---- --:--</span><br>
+                <strong>Nº Atendimento:</strong> 28133804<br>
+            </div>
+        </div>
+
+        <div id="outBoxCor" class="ficha-titulo-class">
+            <span id="outCorTexto">AGUARDANDO...</span>
+        </div>
+
+        <div class="ficha-corpo">
+            <strong>Queixa principal:</strong><br>
+            <span id="outQueixa">-------------------</span><br><br>
+            
+            <strong>Fluxograma:</strong> <span id="outFluxogramaFinal" class="text-uppercase fw-bold">Nenhum</span><br>
+            <strong>Discriminador principal:</strong> <span id="outDiscriminador">Nenhum</span><br>
+            
+            <div class="vitais-print">
+                <div>PA: <span id="pPA">--</span> mmHg</div>
+                <div>Glasgow: <span id="pGlas">--</span></div>
+                <div>Temp: <span id="pTemp">--</span> °C</div>
+                <div>Dor: <span id="pDor">--</span></div>
+            </div>
+            
+            <br>
+            <strong>Alergias:</strong> Nega alergias conhecidas.<br>
+            
+            <div class="assinatura-box">
+                <div>
+                    <strong>Classificador:</strong> ENF. <span id="outEnf">------------</span><br>
+                    <strong>Início da Classificação:</strong> <span id="outData2"></span>
+                </div>
+                <div>
+                    <strong>Coren:</strong> ENF ESTUDANTE COREN/SP: 000000<br>
+                    <strong>Final da Classificação:</strong> <span id="outData3"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Critérios (Exemplo base que servirá para a simulação)
+    const dadosTriagem = [
+        { corId: 'vermelho', classeCss: 'bg-emergencia', titulo: 'Emergência', itens: ["Obstrução de vias aéreas", "Respiração inadequada", "Choque", "Convulsionando"] },
+        { corId: 'laranja', classeCss: 'bg-muitourgente', titulo: 'Muito Urgente', itens: ["Alteração do nível de consciência*", "Novo déficit neurológico < 24h", "Sinais de meningismo", "Púrpura", "Erupção cutânea fixa", "Início abrupto", "Adulto muito quente*", "Sepse possível*", "Dor intensa*"] },
+        { corId: 'amarelo', classeCss: 'bg-urgente', titulo: 'Urgente', itens: ["Novo déficit neurológico > 24h", "Redução recente da acuidade visual", "Adulto febril*"] },
+        { corId: 'verde', classeCss: 'bg-poucourgente', titulo: 'Pouco Urgente', itens: ["Dor leve recente*", "Evento recente"] },
+        { corId: 'azul', classeCss: 'bg-naourgente', titulo: 'Não Urgente', itens: ["Problema recente", "Sem sintomas de risco"] }
+    ];
+
+    const pesosRisco = { 'vermelho': 5, 'laranja': 4, 'amarelo': 3, 'verde': 2, 'azul': 1, 'nenhum': 0 };
+    const nomesRisco = { 'vermelho': 'EMERGÊNCIA - VERMELHO', 'laranja': 'MUITO URGENTE - LARANJA', 'amarelo': 'URGENTE - AMARELO', 'verde': 'POUCO URGENTE - VERDE', 'azul': 'NÃO URGENTE - AZUL' };
+    const coresHex = { 'vermelho': '#d92525', 'laranja': '#f28c00', 'amarelo': '#f2d600', 'verde': '#008f39', 'azul': '#005a9c' };
+    
+    let totalItens = 0; let respostas = {}; let selecoesV = {}; let setorFinal = "";
+
+    // FUNÇÃO DA ETAPA 1
+    function iniciarTriagem() {
+        const fluxogramaSel = document.getElementById('selectFluxograma').value;
+        
+        if (!fluxogramaSel) {
+            alert("Você precisa obrigatoriamente selecionar um Fluxograma no Índice antes de iniciar.");
+            document.getElementById('selectFluxograma').focus();
+            return;
+        }
+
+        // Bloqueia as edições no painel inicial para focar na triagem
+        document.getElementById('painelAdmissao').style.opacity = '0.7';
+        document.getElementById('painelAdmissao').style.pointerEvents = 'none';
+
+        // Atualiza os títulos
+        document.getElementById('tituloFluxogramaTela').innerText = fluxogramaSel;
+        document.getElementById('outFluxogramaFinal').innerText = fluxogramaSel;
+
+        // Libera a barra superior e o grid
+        document.getElementById('barraSuperior').classList.add('ativo');
+        document.getElementById('areaTriagem').style.display = 'block';
+
+        renderizar();
+        document.getElementById('areaTriagem').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function renderizar() {
+        totalItens = 0;
+        const container = document.getElementById('fluxogramaContainer');
+        container.innerHTML = '';
+        
+        dadosTriagem.forEach((bloco, bIdx) => {
+            let html = `
+            <div class="bloco-risco">
+                <div class="titulo-risco ${bloco.classeCss}">${bloco.titulo}</div>
+                <div class="itens-grid">`;
+            
+            bloco.itens.forEach((item, iIdx) => {
+                totalItens++;
+                const idUnico = `item_${bIdx}_${iIdx}`;
+                html += `
+                <div class="discriminador-row" data-id="${idUnico}">
+                    <div class="discriminador-texto">${item}</div>
+                    <div class="d-flex">
+                        <button class="btn-triagem btn-v" id="v_${idUnico}" onclick="marcar('${idUnico}', 'v', '${bloco.corId}', '${item}')">✓</button>
+                        <button class="btn-triagem btn-x" id="x_${idUnico}" onclick="marcar('${idUnico}', 'x', '${bloco.corId}', '${item}')">✗</button>
+                    </div>
+                </div>`;
+            });
+            html += `</div></div>`;
+            container.innerHTML += html;
+        });
+        document.getElementById('progressoTexto').innerText = `0/${totalItens} respondidos`;
+    }
+
+    function marcar(idUnico, tipo, corId, textoItem) {
+        const row = document.querySelector(`[data-id="${idUnico}"]`);
+        if(row) { row.style.borderLeft = "none"; row.style.backgroundColor = ""; }
+
+        document.getElementById(`v_${idUnico}`).classList.remove('active-v');
+        document.getElementById(`x_${idUnico}`).classList.remove('active-x');
+        respostas[idUnico] = tipo;
+
+        if (tipo === 'v') {
+            document.getElementById(`v_${idUnico}`).classList.add('active-v');
+            selecoesV[idUnico] = { cor: corId, texto: textoItem };
+        } else {
+            document.getElementById(`x_${idUnico}`).classList.add('active-x');
+            delete selecoesV[idUnico];
+        }
+        verificarProgresso();
+    }
+
+    function verificarProgresso() {
+        const respondidos = Object.keys(respostas).length;
+        if (respondidos === totalItens) {
+            calcularRiscoFinal();
+        } else {
+            const badge = document.getElementById('statusBadge');
+            badge.innerHTML = `Pendente <span class="progresso-texto">${respondidos}/${totalItens} respondidos</span>`;
+            badge.style.backgroundColor = "#6c757d"; badge.style.color = "white";
+        }
+    }
+
+    function calcularRiscoFinal() {
+        let maiorPeso = 0; let corFinal = 'azul'; let discriminadorPrincipal = 'Sem alterações graves';
+
+        for (let key in selecoesV) {
+            let corAtual = selecoesV[key].cor;
+            if (pesosRisco[corAtual] > maiorPeso) {
+                maiorPeso = pesosRisco[corAtual]; corFinal = corAtual; discriminadorPrincipal = selecoesV[key].texto;
+            }
+        }
+
+        const badge = document.getElementById('statusBadge');
+        badge.innerText = nomesRisco[corFinal];
+        badge.style.backgroundColor = coresHex[corFinal];
+        badge.style.color = corFinal === 'amarelo' ? '#000' : '#fff';
+
+        document.getElementById('outBoxCor').style.color = coresHex[corFinal];
+        document.getElementById('outBoxCor').style.borderColor = coresHex[corFinal];
+        document.getElementById('outDiscriminador').innerText = discriminadorPrincipal;
+        document.getElementById('outCorTexto').dataset.corFinal = nomesRisco[corFinal];
+    }
+
+    function tentarAvancar() {
+        const respondidos = Object.keys(respostas).length;
+        if (respondidos < totalItens) {
+            alert(`⚠️ Faltam avaliar ${totalItens - respondidos} critérios! O sistema destacou em vermelho as linhas que você esqueceu.`);
+            let primeiroErro = null;
+            document.querySelectorAll('.discriminador-row').forEach(row => {
+                const idRow = row.getAttribute('data-id');
+                if (!respostas[idRow]) {
+                    row.style.borderLeft = "5px solid #dc3545"; row.style.backgroundColor = "#f8d7da";
+                    if (!primeiroErro) primeiroErro = row;
+                }
+            });
+            if (primeiroErro) primeiroErro.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+        
+        const modalEnc = new bootstrap.Modal(document.getElementById('modalEncaminhamento'));
+        modalEnc.show();
+    }
+
+    function selecionarSetor(btn, setor) {
+        document.querySelectorAll('.btn-encaminhamento').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        setorFinal = setor;
+        document.getElementById('setorSelecionadoTexto').innerText = "Selecionado: " + setor;
+    }
+
+    function gerarPDF() {
+        if(!setorFinal) { alert("Por favor, selecione um setor de encaminhamento antes de concluir."); return; }
+
+        const corStr = document.getElementById('outCorTexto').dataset.corFinal;
+        document.getElementById('outCorTexto').innerText = corStr + " / " + setorFinal;
+
+        const dataAtual = new Date().toLocaleString('pt-BR');
+        document.getElementById('outNome').innerText = document.getElementById('inpNome').value || 'Não Informado';
+        document.getElementById('outIdade').innerText = document.getElementById('inpIdade').value || '--';
+        document.getElementById('outEnf').innerText = document.getElementById('inpEnf').value || 'Aluno';
+        document.getElementById('outQueixa').innerText = document.getElementById('inpQueixa').value || 'Nenhuma queixa registrada.';
+        
+        document.getElementById('pPA').innerText = document.getElementById('valPA').innerText;
+        document.getElementById('pGlas').innerText = document.getElementById('valGlasgow').innerText;
+        document.getElementById('pTemp').innerText = document.getElementById('valTemp').innerText;
+        document.getElementById('pDor').innerText = document.getElementById('valDor').innerText;
+        
+        document.getElementById('outData').innerText = dataAtual;
+        document.getElementById('outData2').innerText = dataAtual;
+        document.getElementById('outData3').innerText = dataAtual;
+        
+        bootstrap.Modal.getInstance(document.getElementById('modalEncaminhamento')).hide();
+        setTimeout(() => { window.print(); }, 500);
+    }
+
+    // Modal de Sinais Vitais
+    let sinalAtual = '';
+    const modalSinais = new bootstrap.Modal(document.getElementById('modalSinais'));
+    
+    function abrirModal(tipo) { 
+        sinalAtual = tipo; document.getElementById('modalTitulo').innerText = "Inserir " + tipo; 
+        const input = document.getElementById('inputSinal');
+        input.value = ''; input.classList.remove('is-invalid'); document.getElementById('erroSinal').style.display = 'none';
+        modalSinais.show(); setTimeout(() => input.focus(), 500);
+    }
+
+    function salvarSinal() {
+        let val = document.getElementById('inputSinal').value.trim();
+        let valido = true; let erroMsg = "";
+        const inputEl = document.getElementById('inputSinal'); const erroDiv = document.getElementById('erroSinal');
+        inputEl.classList.remove('is-invalid'); erroDiv.style.display = 'none';
+
+        if(!val) return;
+
+        if (sinalAtual === 'Temperatura') {
+            val = val.replace(',', '.'); let num = parseFloat(val);
+            if (isNaN(num) || num < 30 || num > 45) { valido = false; erroMsg = "Entre 30 e 45."; } else { val = num.toFixed(1); }
+        } else if (sinalAtual === 'Pressao') {
+            val = val.replace(/[^0-9]/g, '/').replace(/\/+/g, '/'); let partes = val.split('/');
+            if (partes.length !== 2 || !partes[0] || !partes[1]) { valido = false; erroMsg = "Ex: 120/80."; }
+        } else if (sinalAtual === 'Glasgow') {
+            let num = parseInt(val); if (isNaN(num) || num < 3 || num > 15) { valido = false; erroMsg = "Entre 3 e 15."; } else { val = num; }
+        } else if (sinalAtual === 'Dor') {
+            let num = parseInt(val); if (isNaN(num) || num < 0 || num > 10) { valido = false; erroMsg = "Entre 0 e 10."; } else { val = num; }
+        }
+
+        if (!valido) { inputEl.classList.add('is-invalid'); erroDiv.innerText = erroMsg; erroDiv.style.display = 'block'; return; }
+
+        let alvoId = '';
+        if(sinalAtual === 'Pressao') alvoId = 'valPA';
+        else if(sinalAtual === 'Temperatura') alvoId = 'valTemp';
+        else if(sinalAtual === 'Glasgow') alvoId = 'valGlasgow';
+        else if(sinalAtual === 'Dor') alvoId = 'valDor';
+
+        document.getElementById(alvoId).innerText = val;
+        modalSinais.hide();
+    }
+</script>
+</body>
+</html>
